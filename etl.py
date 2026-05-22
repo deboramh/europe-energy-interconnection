@@ -2,36 +2,29 @@ import sqlite3
 
 import pandas as pd
 
+MONTH_MAP = {
+    "Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
+    "May": 5, "Jun": 6, "Jul": 7, "Aug": 8,
+    "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
+}
 
-# ── EXTRACT ────────────────────────────────────────────────
 def extract(filepath):
     df = pd.read_csv(filepath)
     print(f"[extract] {len(df)} linhas, {df['Country'].nunique()} países")
     return df
 
-
-# ── TRANSFORM ──────────────────────────────────────────────
 def transform(df):
-    # Renomear colunas
     df.columns = ["country", "hour", "res_penetration_pct", "net_position_pct"]
-
-    # Garantir tipos corretos
     df["hour"] = df["hour"].astype(int)
     df["res_penetration_pct"] = df["res_penetration_pct"].astype(float)
     df["net_position_pct"] = df["net_position_pct"].astype(float)
-
-    # Classificar cada hora como importador ou exportador
     df["trade_status"] = df["net_position_pct"].apply(
         lambda x: "exporter" if x > 0 else "importer"
     )
-
-    # Filtrar só Portugal
     pt = df[df["country"] == "Portugal"].copy()
     print(f"[transform] Portugal: {len(pt)} horas")
     return df, pt
 
-
-# ── LOAD ───────────────────────────────────────────────────
 def load(df_all, df_pt, db_path="data/processed/energy.db"):
     conn = sqlite3.connect(db_path)
     df_all.to_sql("country_hourly_2024", conn, if_exists="replace", index=False)
@@ -39,14 +32,43 @@ def load(df_all, df_pt, db_path="data/processed/energy.db"):
     conn.close()
     print(f"[load] Guardado em {db_path}")
 
+def extract_monthly(filepath):
+    df = pd.read_csv(filepath)
+    print(f"[extract_monthly] {len(df)} linhas, {df['Country'].nunique()} países")
+    return df
 
-# ── MAIN ───────────────────────────────────────────────────
+def transform_monthly(df):
+    df.columns = ["country", "month", "res_penetration_pct", "net_position_pct"]
+    df["month_num"] = df["month"].map(MONTH_MAP)
+    df["res_penetration_pct"] = df["res_penetration_pct"].astype(float)
+    df["net_position_pct"] = df["net_position_pct"].astype(float)
+    df["trade_status"] = df["net_position_pct"].apply(
+        lambda x: "exporter" if x > 0 else "importer"
+    )
+    pt = df[df["country"] == "Portugal"].copy()
+    print(f"[transform_monthly] Portugal: {len(pt)} meses")
+    return df, pt
+
+def load_monthly(df_all, df_pt, db_path="data/processed/energy.db"):
+    conn = sqlite3.connect(db_path)
+    df_all.to_sql("country_monthly_2024", conn, if_exists="replace", index=False)
+    df_pt.to_sql("portugal_monthly_2024", conn, if_exists="replace", index=False)
+    conn.close()
+    print(f"[load_monthly] Guardado em {db_path}")
+
 if __name__ == "__main__":
-    filepath = "data/raw/europe_interconnection_data/country indicators/country_hourly_chart_2024.csv"
-    df = extract(filepath)
+    # Horário
+    df = extract("data/raw/europe_interconnection_data/country indicators/country_hourly_chart_2024.csv")
     df_all, df_pt = transform(df)
     load(df_all, df_pt)
-
-    # Preview Portugal
     print("\nPortugal — perfil horário:")
     print(df_pt.to_string(index=False))
+
+    print("\n" + "="*50 + "\n")
+
+    # Mensal
+    df_m = extract_monthly("data/raw/europe_interconnection_data/country indicators/country_monthly_chart_2024.csv")
+    df_all_m, df_pt_m = transform_monthly(df_m)
+    load_monthly(df_all_m, df_pt_m)
+    print("\nPortugal — perfil mensal:")
+    print(df_pt_m.to_string(index=False))
