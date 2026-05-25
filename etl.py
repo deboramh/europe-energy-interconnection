@@ -135,6 +135,31 @@ def load_flows(df_all, df_pt, db_path="data/processed/energy.db"):
     print(f"[load_flows] Guardado em {db_path}")
 
 
+def extract_imp_pot(filepath):
+    df = pd.read_csv(filepath)
+    print(f"[extract_imp_pot] {len(df)} linhas, {df['Country'].nunique()} países")
+    return df
+
+
+def transform_imp_pot(df):
+    df.columns = [
+        "country",
+        "current_2024_mw",
+        "reference_mw",
+        "projects_mw",
+        "needs_mw",
+    ]
+    print(f"[transform_imp_pot] {len(df)} países")
+    return df
+
+
+def load_imp_pot(df, db_path="data/processed/energy.db"):
+    conn = sqlite3.connect(db_path)
+    df.to_sql("import_potential_2030", conn, if_exists="replace", index=False)
+    conn.close()
+    print(f"[load_imp_pot] Guardado em {db_path}")
+
+
 if __name__ == "__main__":
     # Horário
     df = extract(
@@ -177,3 +202,14 @@ if __name__ == "__main__":
     load_flows(df_all_f, df_pt_f)
     print("\nPortugal — fluxos horários:")
     print(df_pt_f.to_string(index=False))
+
+    print("\n" + "=" * 50 + "\n")
+
+    # Potencial de importação
+    df_imp = extract_imp_pot(
+        "data/raw/europe_interconnection_data/Import potential/imp_pot_chart_2030.csv"
+    )
+    df_imp = transform_imp_pot(df_imp)
+    load_imp_pot(df_imp)
+    print("\nPotencial de importação 2030:")
+    print(df_imp.to_string(index=False))
