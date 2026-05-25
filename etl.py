@@ -49,6 +49,26 @@ def transform_monthly(df):
     print(f"[transform_monthly] Portugal: {len(pt)} meses")
     return df, pt
 
+def extract_ntc(filepath):
+    df = pd.read_csv(filepath)
+    print(f"[extract_ntc] {len(df)} linhas, {df['Border'].nunique()} fronteiras")
+    return df
+
+def transform_ntc(df):
+    df.columns = ["border", "from_country", "to_country", "year", "ntc_forward_mw", "ntc_backward_mw"]
+    df = df[df["year"] == 2024].copy()
+    df["capacity_asymmetry_mw"] = df["ntc_forward_mw"] - df["ntc_backward_mw"]
+    pt = df[df["border"].str.contains("PT")].copy()
+    print(f"[transform_ntc] {len(df)} fronteiras em 2024, Portugal: {len(pt)} fronteira(s)")
+    return df, pt
+
+def load_ntc(df_all, df_pt, db_path="data/processed/energy.db"):
+    conn = sqlite3.connect(db_path)
+    df_all.to_sql("borders_ntc_2024", conn, if_exists="replace", index=False)
+    df_pt.to_sql("portugal_ntc_2024", conn, if_exists="replace", index=False)
+    conn.close()
+    print(f"[load_ntc] Guardado em {db_path}")
+
 def load_monthly(df_all, df_pt, db_path="data/processed/energy.db"):
     conn = sqlite3.connect(db_path)
     df_all.to_sql("country_monthly_2024", conn, if_exists="replace", index=False)
@@ -72,3 +92,12 @@ if __name__ == "__main__":
     load_monthly(df_all_m, df_pt_m)
     print("\nPortugal — perfil mensal:")
     print(df_pt_m.to_string(index=False))
+
+    print("\n" + "="*50 + "\n")
+
+    # Capacidade de interligação
+    df_n = extract_ntc("data/raw/europe_interconnection_data/Interconnectors/REF_NTC.csv")
+    df_all_n, df_pt_n = transform_ntc(df_n)
+    load_ntc(df_all_n, df_pt_n)
+    print("\nPortugal — capacidade de interligação:")
+    print(df_pt_n.to_string(index=False))
