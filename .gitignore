@@ -4,3 +4,5 @@ data/processed/
 *.csv
 .DS_Store
 .vscode/
+scratch.py
+ *.ipynb
